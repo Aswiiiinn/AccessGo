@@ -1,0 +1,36 @@
+# Virtual environment
+acssgo/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Django
+backend/db.sqlite3
+backend/media/
+backend/staticfiles/
+backend/*.env
+
+# Environment variables
+.env
+.env.local
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
