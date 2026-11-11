@@ -12,7 +12,7 @@ User = get_user_model()
 LOGIN_URL = reverse("token_obtain_pair")
 
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+# ── helpers ───────────────────────────────────────────────────────────────────
 
 def get_token(client, email, password):
     res = client.post(LOGIN_URL, {"email": email, "password": password})
@@ -57,7 +57,6 @@ class ReportCRUDTest(APITestCase):
         payload.update(overrides)
         return self.client.post(self.list_url, payload)
 
-    # create
     def test_authenticated_user_can_create_report(self):
         res = self._create()
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
@@ -65,6 +64,8 @@ class ReportCRUDTest(APITestCase):
         self.assertEqual(res.data["status"], "pending")
         self.assertIn("images", res.data)
         self.assertIn("verification_count", res.data)
+        self.assertIn("confirm_count", res.data)
+        self.assertIn("dispute_count", res.data)
 
     def test_unauthenticated_cannot_create(self):
         self.client.credentials()
@@ -78,7 +79,6 @@ class ReportCRUDTest(APITestCase):
         res = self.client.post(self.list_url, {"title": "No location"})
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
-    # read
     def test_anyone_can_list_reports(self):
         self._create()
         self.client.credentials()
@@ -93,7 +93,6 @@ class ReportCRUDTest(APITestCase):
         res = self.client.get(self._detail(pk))
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
-    # update
     def test_author_can_update_own_report(self):
         pk = self._create().data["id"]
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.author_token}")
@@ -125,7 +124,6 @@ class ReportCRUDTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIsNone(res.data["ai_classification"])
 
-    # delete
     def test_author_can_delete_own_report(self):
         pk = self._create().data["id"]
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.author_token}")
@@ -138,7 +136,6 @@ class ReportCRUDTest(APITestCase):
         res = self.client.delete(self._detail(pk))
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
-    # filters
     def test_filter_by_status(self):
         self._create()
         self.client.credentials()
@@ -222,9 +219,7 @@ class ReportImageUploadTest(APITestCase):
 
     def test_oversized_image_rejected(self):
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.author_token}")
-        big = SimpleUploadedFile(
-            "big.jpg", b"x" * (6 * 1024 * 1024), content_type="image/jpeg"
-        )
+        big = SimpleUploadedFile("big.jpg", b"x" * (6 * 1024 * 1024), content_type="image/jpeg")
         res = self.client.post(self.upload_url, {"image": big}, format="multipart")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -261,13 +256,12 @@ class ReportImageUploadTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
 
 
-# ── Verification ──────────────────────────────────────────────────────────────
+# ── Verification (existing) ───────────────────────────────────────────────────
 
 class ReportVerificationTest(APITestCase):
     def setUp(self):
         self.author   = User.objects.create_user(email="vauthor@example.com",   password="Pass1234!")
         self.verifier = User.objects.create_user(email="vverifier@example.com", password="Pass1234!")
-        self.other    = User.objects.create_user(email="vother@example.com",    password="Pass1234!")
         self.location = make_location(name="Entrance", location_type="entrance")
         self.author_token   = get_token(self.client, "vauthor@example.com",   "Pass1234!")
         self.verifier_token = get_token(self.client, "vverifier@example.com", "Pass1234!")
@@ -321,6 +315,170 @@ class ReportVerificationTest(APITestCase):
         self.client.credentials()
         res = self.client.get(reverse("report-detail", args=[self.report_id]))
         self.assertEqual(res.data["verification_count"], 1)
+
+
+# ── Verification Business Rules ───────────────────────────────────────────────
+
+class VerificationBusinessRulesTest(APITestCase):
+    def setUp(self):
+        self.author    = User.objects.create_user(email="br_author@example.com",    password="Pass1234!")
+        self.verifier  = User.objects.create_user(email="br_verifier@example.com",  password="Pass1234!")
+        self.verifier2 = User.objects.create_user(email="br_verifier2@example.com", password="Pass1234!")
+        self.admin     = User.objects.create_user(email="br_admin@example.com",     password="Pass1234!", role="admin")
+        self.location  = make_location(name="BR Station", location_type="station")
+
+        self.author_token    = get_token(self.client, "br_author@example.com",    "Pass1234!")
+        self.verifier_token  = get_token(self.client, "br_verifier@example.com",  "Pass1234!")
+        self.verifier2_token = get_token(self.client, "br_verifier2@example.com", "Pass1234!")
+        self.admin_token     = get_token(self.client, "br_admin@example.com",     "Pass1234!")
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.author_token}")
+        res = self.client.post(reverse("report-list"), {
+            "location": self.location.pk,
+            "title": "Broken ramp",
+            "description": "Ramp is blocked.",
+        })
+        self.report_id      = res.data["id"]
+        self.verify_url     = reverse("report-verify",          args=[self.report_id])
+        self.dispute_url    = reverse("report-dispute",         args=[self.report_id])
+        self.list_ver_url   = reverse("report-verifications",   args=[self.report_id])
+        self.my_ver_url     = reverse("report-my-verification", args=[self.report_id])
+        self.set_status_url = reverse("report-set-status",      args=[self.report_id])
+
+    # user can verify another user's report
+    def test_user_can_verify_another_users_report(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier_token}")
+        res = self.client.post(self.verify_url, {"vote": "confirm"})
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    # user cannot verify their own report
+    def test_user_cannot_verify_own_report(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.author_token}")
+        res = self.client.post(self.verify_url, {"vote": "confirm"})
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    # user cannot submit duplicate verifications
+    def test_duplicate_verification_rejected(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier_token}")
+        self.client.post(self.verify_url, {"vote": "confirm"})
+        res = self.client.post(self.verify_url, {"vote": "confirm"})
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(ReportVerification.objects.filter(report_id=self.report_id).count(), 1)
+
+    # VER-02: dispute endpoint creates dispute vote
+    def test_dispute_endpoint_creates_dispute_vote(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier_token}")
+        res = self.client.post(self.dispute_url, {"comment": "I disagree."})
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data["vote"], "dispute")
+
+    # author cannot dispute own report
+    def test_author_cannot_dispute_own_report(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.author_token}")
+        res = self.client.post(self.dispute_url, {})
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    # VER-03: list verifications is public
+    def test_list_verifications_is_public(self):
+        self.client.credentials()
+        res = self.client.get(self.list_ver_url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_list_verifications_returns_all_votes(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier_token}")
+        self.client.post(self.verify_url, {"vote": "confirm"})
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier2_token}")
+        self.client.post(self.dispute_url, {"comment": "Disputed."})
+        self.client.credentials()
+        res = self.client.get(self.list_ver_url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 2)
+
+    # disputes counted separately from confirms
+    def test_confirm_and_dispute_counts_are_separate(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier_token}")
+        self.client.post(self.verify_url, {"vote": "confirm"})
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier2_token}")
+        self.client.post(self.dispute_url, {})
+        self.client.credentials()
+        res = self.client.get(reverse("report-detail", args=[self.report_id]))
+        self.assertEqual(res.data["confirm_count"], 1)
+        self.assertEqual(res.data["dispute_count"], 1)
+        self.assertEqual(res.data["verification_count"], 2)
+
+    # user can change their existing verification
+    def test_user_can_change_existing_verification(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier_token}")
+        self.client.post(self.verify_url, {"vote": "confirm"})
+        res = self.client.patch(self.my_ver_url, {"vote": "dispute", "comment": "Changed my mind."})
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["vote"], "dispute")
+        self.assertEqual(ReportVerification.objects.filter(report_id=self.report_id).count(), 1)
+
+    def test_change_verification_without_existing_returns_400(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier_token}")
+        res = self.client.patch(self.my_ver_url, {"vote": "confirm"})
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    # VER-04: user can withdraw their verification
+    def test_user_can_withdraw_verification(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier_token}")
+        self.client.post(self.verify_url, {"vote": "confirm"})
+        res = self.client.delete(self.my_ver_url)
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(ReportVerification.objects.filter(report_id=self.report_id).count(), 0)
+
+    def test_withdraw_nonexistent_verification_returns_400(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier_token}")
+        res = self.client.delete(self.my_ver_url)
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_unauthenticated_cannot_withdraw(self):
+        self.client.credentials()
+        res = self.client.delete(self.my_ver_url)
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    # verification count updates correctly after withdraw
+    def test_verification_count_updates_after_withdraw(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier_token}")
+        self.client.post(self.verify_url, {"vote": "confirm"})
+        self.client.delete(self.my_ver_url)
+        self.client.credentials()
+        res = self.client.get(reverse("report-detail", args=[self.report_id]))
+        self.assertEqual(res.data["verification_count"], 0)
+
+    # rejected reports cannot receive new verifications
+    def test_rejected_report_cannot_receive_verification(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.admin_token}")
+        self.client.patch(self.set_status_url, {"status": "rejected"}, format="json")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier_token}")
+        res = self.client.post(self.verify_url, {"vote": "confirm"})
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    # verification cannot directly change report status
+    def test_verification_does_not_change_report_status(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier_token}")
+        self.client.post(self.verify_url, {"vote": "confirm"})
+        self.client.credentials()
+        res = self.client.get(reverse("report-detail", args=[self.report_id]))
+        self.assertEqual(res.data["status"], "pending")
+
+    # admin has final authority over report status
+    def test_admin_can_set_report_status(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.admin_token}")
+        res = self.client.patch(self.set_status_url, {"status": "verified"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "verified")
+
+    def test_regular_user_cannot_set_report_status(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.verifier_token}")
+        res = self.client.patch(self.set_status_url, {"status": "verified"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_author_cannot_set_report_status(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.author_token}")
+        res = self.client.patch(self.set_status_url, {"status": "verified"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
 
 # ── Service layer ─────────────────────────────────────────────────────────────

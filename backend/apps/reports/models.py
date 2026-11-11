@@ -64,6 +64,7 @@ class ReportVerification(models.Model):
     vote = models.CharField(max_length=10, choices=Vote.choices)
     comment = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ("report", "verifier")

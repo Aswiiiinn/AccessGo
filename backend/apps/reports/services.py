@@ -1,5 +1,5 @@
 from django.db import transaction, IntegrityError
-from rest_framework.exceptions import ValidationError as DRFValidationError
+from rest_framework.exceptions import ValidationError as DRFValidationError, PermissionDenied
 from .models import AccessibilityReport, ReportVerification, ReportImage
 from .validators import validate_report_image
 
@@ -14,14 +14,19 @@ def update_report_status(report: AccessibilityReport, status: str) -> Accessibil
     return report
 
 
+def _guard_report_open_for_verification(report: AccessibilityReport) -> None:
+    """Rejected reports cannot receive new verifications."""
+    if report.status == AccessibilityReport.Status.REJECTED:
+        raise DRFValidationError(
+            {"detail": "Rejected reports cannot receive new verifications."}
+        )
+
+
 @transaction.atomic
 def add_verification(
     report: AccessibilityReport, verifier, vote: str, comment: str = ""
 ) -> ReportVerification:
-    """
-    Atomically creates a verification vote.
-    Raises DRFValidationError if the user has already voted on this report.
-    """
+    _guard_report_open_for_verification(report)
     try:
         verification = ReportVerification.objects.create(
             report=report,
@@ -34,6 +39,34 @@ def add_verification(
             {"detail": "You have already submitted a verification for this report."}
         )
     return verification
+
+
+@transaction.atomic
+def change_verification(
+    report: AccessibilityReport, verifier, vote: str, comment: str = ""
+) -> ReportVerification:
+    """Update an existing verification vote. Raises 400 if none exists."""
+    _guard_report_open_for_verification(report)
+    updated = ReportVerification.objects.filter(
+        report=report, verifier=verifier
+    ).update(vote=vote, comment=comment)
+    if not updated:
+        raise DRFValidationError(
+            {"detail": "No existing verification found. Submit a verification first."}
+        )
+    return ReportVerification.objects.get(report=report, verifier=verifier)
+
+
+@transaction.atomic
+def withdraw_verification(report: AccessibilityReport, verifier) -> None:
+    """Delete the user's verification. Raises 400 if none exists."""
+    deleted, _ = ReportVerification.objects.filter(
+        report=report, verifier=verifier
+    ).delete()
+    if not deleted:
+        raise DRFValidationError(
+            {"detail": "No verification found to withdraw."}
+        )
 
 
 def add_image(report: AccessibilityReport, image_file) -> ReportImage:
