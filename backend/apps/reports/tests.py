@@ -9,7 +9,7 @@ User = get_user_model()
 
 class ReportServiceTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="reporter", password="pass1234!")
+        self.user = User.objects.create_user(email="reporter@example.com", password="pass1234!")
         self.location = AccessibilityLocation.objects.create(
             name="Test Station", latitude=51.5, longitude=-0.1, location_type="station"
         )
@@ -29,7 +29,7 @@ class ReportServiceTest(TestCase):
             "title": "Broken ramp",
             "description": "Ramp is blocked.",
         })
-        verifier = User.objects.create_user(username="verifier", password="pass1234!")
+        verifier = User.objects.create_user(email="verifier@example.com", password="pass1234!")
         add_verification(report, verifier, "confirm")
         add_verification(report, verifier, "confirm")
         self.assertEqual(ReportVerification.objects.filter(report=report).count(), 1)
