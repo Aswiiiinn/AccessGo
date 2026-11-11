@@ -6,6 +6,11 @@ class ReportImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReportImage
         fields = ("id", "image", "uploaded_at")
+        read_only_fields = ("id", "uploaded_at")
+
+
+class ReportImageUploadSerializer(serializers.Serializer):
+    image = serializers.ImageField()
 
 
 class ReportVerificationSerializer(serializers.ModelSerializer):
@@ -30,7 +35,10 @@ class AccessibilityReportSerializer(serializers.ModelSerializer):
             "ai_classification", "images", "verification_count",
             "created_at", "updated_at",
         )
-        read_only_fields = ("id", "author", "status", "ai_classification", "created_at", "updated_at")
+        read_only_fields = (
+            "id", "author", "status", "ai_classification",
+            "created_at", "updated_at",
+        )
 
     def get_verification_count(self, obj):
         return obj.verifications.count()
