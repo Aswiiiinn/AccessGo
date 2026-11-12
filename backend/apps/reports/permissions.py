@@ -8,6 +8,21 @@ class IsAuthorOrReadOnly(BasePermission):
         return obj.author == request.user
 
 
+class IsAuthorOrAdmin(BasePermission):
+    """Allow access only to the report author or an admin user."""
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated)
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if getattr(user, "is_admin_user", False):
+            return True
+        return obj.author == user
+
+
 class IsVerifierNotAuthor(BasePermission):
     """Prevents report authors from verifying their own reports."""
 

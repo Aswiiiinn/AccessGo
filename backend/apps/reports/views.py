@@ -6,18 +6,20 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import NotAuthenticated, PermissionDenied
 from django.shortcuts import get_object_or_404
 
-from .models import AccessibilityReport, ReportImage, ReportVerification
+from .models import AccessibilityReport, ReportClassification, ReportImage, ReportVerification
 from .serializers import (
     AccessibilityReportSerializer,
+    ReportClassificationSerializer,
     ReportVerificationSerializer,
     ReportImageSerializer,
     ReportImageUploadSerializer,
     AdminReportStatusSerializer,
 )
-from .permissions import IsAuthorOrReadOnly, IsImageOwner
+from .permissions import IsAuthorOrAdmin, IsAuthorOrReadOnly, IsImageOwner
 from .services import (
     add_verification,
     change_verification,
+    classify_report_async,
     withdraw_verification,
     add_image,
     delete_image,
@@ -28,7 +30,7 @@ from apps.accounts.permissions import IsAdminUser
 
 class AccessibilityReportViewSet(viewsets.ModelViewSet):
     queryset = AccessibilityReport.objects.select_related(
-        "author", "location"
+        "author", "location", "classification"
     ).prefetch_related("images", "verifications")
     serializer_class = AccessibilityReportSerializer
     parser_classes = (JSONParser, MultiPartParser, FormParser)
@@ -43,10 +45,21 @@ class AccessibilityReportViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated(), IsAuthorOrReadOnly()]
         if self.action == "set_status":
             return [permissions.IsAuthenticated(), IsAdminUser()]
+        if self.action == "classification":
+            return [permissions.IsAuthenticated(), IsAuthorOrAdmin()]
         return [permissions.AllowAny()]
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        report = serializer.save(author=self.request.user)
+        try:
+            ReportClassification.objects.get_or_create(
+                report=report,
+                defaults={"classification_status": ReportClassification.Status.PENDING},
+            )
+            classify_report_async(report)
+        except Exception:
+            # Report creation must succeed even if classification setup/execution fails.
+            pass
 
     def _require_auth(self, request):
         if not request.user or not request.user.is_authenticated:
@@ -128,6 +141,15 @@ class AccessibilityReportViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         updated = update_report_status(report, serializer.validated_data["status"])
         return Response(AccessibilityReportSerializer(updated).data)
+
+    @action(detail=True, methods=["get"], url_path="classification", permission_classes=[permissions.IsAuthenticated, IsAuthorOrAdmin])
+    def classification(self, request, pk=None):
+        report = self.get_object()
+        classification, _ = ReportClassification.objects.get_or_create(
+            report=report,
+            defaults={"classification_status": ReportClassification.Status.PENDING},
+        )
+        return Response(ReportClassificationSerializer(classification).data)
 
 
 class ReportImageView(APIView):

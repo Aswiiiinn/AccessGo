@@ -89,7 +89,25 @@ Default ordering: `-created_at`
 
 ---
 
-## ReportVerification (reports.ReportVerification)
+## ReportClassification (reports.ReportClassification)
+
+| Field               | Type      | Notes                                      |
+|---------------------|-----------|--------------------------------------------|
+| id                  | BigInt PK |                                            |
+| report              | OneToOne  | → AccessibilityReport (CASCADE), unique    |
+| suggested_category  | CharField | AI suggestion (validated against allowed)   |
+| suggested_severity  | CharField | AI suggestion (low/medium/high/critical)   |
+| keywords            | JSONField | List of strings                            |
+| summary             | TextField | Short AI summary                           |
+| confidence_score    | Float     | Nullable (0..1)                            |
+| ai_provider         | CharField | e.g. `gemini`                              |
+| model_name          | CharField | Configured model id                        |
+| classification_status | CharField | pending, completed, failed               |
+| error_message       | TextField | Failure reason (if any)                    |
+| created_at          | DateTime  | Auto                                       |
+| updated_at          | DateTime  | Auto                                       |
+
+Indexes: `classification_status`, `report`. One classification per report; reprocessing updates the same record. AI suggestions do not overwrite user report fields.
 
 | Field      | Type      | Notes                              |
 |------------|-----------|------------------------------------|

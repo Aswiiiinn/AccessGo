@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 
@@ -13,6 +14,7 @@ class AccessGoUserManager(UserManager):
     def create_superuser(self, username=None, email=None, password=None, **extra_fields):
         email = email or username
         username = username or (email.split("@")[0] if email else None)
+        extra_fields.setdefault("role", "admin")
         return super().create_superuser(username, email, password, **extra_fields)
 
 
@@ -39,4 +41,39 @@ class User(AbstractUser):
 
     @property
     def is_admin_user(self):
-        return self.role == self.Role.ADMIN
+        return self.role == self.Role.ADMIN or self.is_superuser
+
+
+class AdminReportReview(models.Model):
+    class Action(models.TextChoices):
+        VERIFY = "verify", "Verify"
+        REJECT = "reject", "Reject"
+        RESOLVE = "resolve", "Resolve"
+        REQUEST_INFO = "request_info", "Request Info"
+
+    report = models.ForeignKey(
+        "reports.AccessibilityReport",
+        on_delete=models.CASCADE,
+        related_name="admin_reviews",
+    )
+    admin = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="admin_report_reviews",
+    )
+    previous_status = models.CharField(max_length=20)
+    new_status = models.CharField(max_length=20)
+    action = models.CharField(max_length=20, choices=Action.choices)
+    review_comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["report", "created_at"]),
+            models.Index(fields=["admin", "created_at"]),
+            models.Index(fields=["action"]),
+        ]
+
+    def __str__(self):
+        return f"{self.report_id} {self.action} by {self.admin_id}"

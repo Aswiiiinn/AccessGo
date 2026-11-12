@@ -5,3 +5,4 @@ django-cors-headers==4.9.0
 django-filter==26.2
 python-dotenv==1.2.4
 Pillow==13.0.0
+google-genai

@@ -32,7 +32,6 @@ LOCAL_APPS = [
     "apps.accounts",
     "apps.accessibility",
     "apps.reports",
-    "apps.dashboard",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -128,3 +127,8 @@ SIMPLE_JWT = {
 
 AI_API_KEY = os.environ.get("AI_API_KEY", "")
 AI_API_URL = os.environ.get("AI_API_URL", "")
+
+# Gemini AI classification
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "")
+GEMINI_TIMEOUT_SECONDS = float(os.environ.get("GEMINI_TIMEOUT_SECONDS", "15"))

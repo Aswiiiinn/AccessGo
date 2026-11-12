@@ -1,4 +1,4 @@
-# API Endpoint Documentation
+﻿# API Endpoint Documentation
 
 Base URL: `http://localhost:8000/api/v1`
 
@@ -17,17 +17,6 @@ All authenticated endpoints require: `Authorization: Bearer <access_token>`
 | GET    | `/profile/`           | Yes  | Get current user profile     |
 | PATCH  | `/profile/`           | Yes  | Update current user profile  |
 
-### POST /register/
-```json
-{ "username": "alice", "email": "alice@example.com", "password": "secure123!" }
-```
-
-### POST /login/
-```json
-{ "username": "alice", "password": "secure123!" }
-```
-Response: `{ "access": "...", "refresh": "..." }`
-
 ---
 
 ## Accessibility — `/api/v1/accessibility/`
@@ -41,16 +30,6 @@ Response: `{ "access": "...", "refresh": "..." }`
 | DELETE | `/locations/{id}/`              | Admin | Delete a location              |
 | GET    | `/locations/nearby/`            | No    | Get nearby locations           |
 
-### GET /locations/nearby/
-Query params: `lat`, `lng`, `radius` (km, default 1.0)
-
-Example: `/locations/nearby/?lat=51.5074&lng=-0.1278&radius=0.5`
-
-### Filters
-- `location_type` — station, bus_stop, entrance, pathway, other
-- `is_active` — true/false
-- `search` — searches name and address
-
 ---
 
 ## Reports — `/api/v1/reports/`
@@ -62,48 +41,48 @@ Example: `/locations/nearby/?lat=51.5074&lng=-0.1278&radius=0.5`
 | GET    | `/{id}/`                  | No       | Get a single report                |
 | PATCH  | `/{id}/`                  | Author   | Update own report                  |
 | DELETE | `/{id}/`                  | Author   | Delete own report                  |
-| POST   | `/{id}/verify/`           | Yes*     | Submit a verification vote         |
+| POST   | `/{id}/verify/`           | Yes*     | Submit community verification      |
 
-*Cannot verify your own report.
-
-### POST /reports/
-```json
-{
-  "location": 1,
-  "title": "Broken elevator at main entrance",
-  "description": "The elevator has been out of service since Monday.",
-  "accessibility_impact": "high"
-}
-```
-
-### POST /reports/{id}/verify/
-```json
-{ "vote": "confirm", "comment": "Confirmed — still broken as of today." }
-```
-
-### Filters
-- `status` — pending, verified, rejected, resolved
-- `location` — location ID
-- `accessibility_impact` — low, medium, high, critical
-- `search` — searches title and description
+*Community verification endpoints remain under reports; admin moderation is under dashboard endpoints.
 
 ---
 
-## Dashboard — `/api/v1/dashboard/`
+## Admin Dashboard (Accounts App) — `/api/v1/dashboard/`
 
-| Method | Endpoint   | Auth  | Description              |
-|--------|------------|-------|--------------------------|
-| GET    | `/stats/`  | Admin | Get platform statistics  |
+All endpoints below require JWT authentication and `ADMIN` role. Unauthenticated: `401`, non-admin authenticated: `403`.
 
-### Response
-```json
-{
-  "total_reports": 42,
-  "pending_reports": 10,
-  "verified_reports": 25,
-  "resolved_reports": 5,
-  "total_locations": 18,
-  "total_users": 120,
-  "reports_by_impact": { "low": 5, "medium": 15, "high": 18, "critical": 4 }
-}
-```
+### Statistics
+- `GET /statistics/` — aggregate platform counts (reports by status, high-severity, users, locations, community verification totals).
+
+### Report management
+- `GET /reports/` — list all reports (paginated). Supports `search` (title/description), filters `status`, `category`, `severity` (`accessibility_impact`), `user`, `submitted_from`, `submitted_to` (YYYY-MM-DD), ordering and pagination.
+- `GET /reports/{id}/` — report detail including creator, location, uploaded photographs, community verification records, verification counts, and administrative review history.
+
+### Moderation actions
+- `POST /reports/{id}/verify/` body: `{ "review_comment": "optional" }` (pending -> verified)
+- `POST /reports/{id}/reject/` body: `{ "review_comment": "required reason" }` (pending -> rejected)
+- `POST /reports/{id}/resolve/` body: `{ "review_comment": "optional" }` (verified -> resolved)
+- `POST /reports/{id}/request-info/` body: `{ "review_comment": "optional" }` (pending -> pending, audit record created)
+
+Invalid transitions return `400` with detail. Each action creates an immutable `AdminReportReview` audit record.
+
+### Analytics
+- `GET /reports-by-category/`
+- `GET /reports-by-status/`
+- `GET /reports-over-time/?group=day|month`
+- `GET /high-severity-reports/` (pending high/critical)
+
+### User management
+- `GET /users/` — list users, `search` (name/email/username), filter `role`, `is_active`, pagination.
+- `GET /users/{id}/` — user details with submitted reports and registration date.
+- `PATCH /users/{id}/status/` body: `{ "is_active": true|false }` (cannot deactivate own account; password/auth secrets never exposed).
+
+### Error envelope
+API errors use: `{"error": true, "status_code": <code>, "detail": ...}`.
+## AI Classification (Gemini)
+
+- `GET /api/v1/reports/{id}/classification/` (auth required): returns AI classification for a report. Only the report author or an admin can access.
+- On report creation (`POST /api/v1/reports/`), the report is saved first and classification runs immediately (safely); failures do not block report creation and are recorded with `classification_status: failed`.
+- AI suggestions are stored separately in `ReportClassification` (and mirrored as read-only JSON on `ai_classification`) and never overwrite user-provided `category` or `accessibility_impact`.
+- Response fields: `suggested_category`, `suggested_severity`, `keywords`, `summary`, `confidence_score`, `ai_provider`, `model_name`, `classification_status`, `error_message`, timestamps.
+- Configure `GEMINI_API_KEY` and `GEMINI_MODEL` in backend environment; without them classification is recorded as unavailable/failed and report creation still succeeds.

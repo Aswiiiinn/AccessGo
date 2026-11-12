@@ -16,6 +16,26 @@ class AccessibilityReport(models.Model):
         HIGH = "high", "High"
         CRITICAL = "critical", "Critical"
 
+    # No fixed DB choices for category in existing model; AI suggestions validated against this set.
+    AI_SUGGESTED_CATEGORIES = (
+        "elevator",
+        "ramp",
+        "tactile_paving",
+        "accessible_toilet",
+        "hearing_loop",
+        "braille_signage",
+        "step_free",
+        "pathway",
+        "entrance",
+        "parking",
+        "signage",
+        "obstacle",
+        "surface",
+        "lighting",
+        "other",
+        "unknown",
+    )
+
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reports"
     )
@@ -44,6 +64,39 @@ class AccessibilityReport(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class ReportClassification(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        COMPLETED = "completed", "Completed"
+        FAILED = "failed", "Failed"
+
+    report = models.OneToOneField(
+        AccessibilityReport, on_delete=models.CASCADE, related_name="classification"
+    )
+    suggested_category = models.CharField(max_length=50, blank=True)
+    suggested_severity = models.CharField(max_length=10, blank=True)
+    keywords = models.JSONField(default=list, blank=True)
+    summary = models.TextField(blank=True)
+    confidence_score = models.FloatField(null=True, blank=True)
+    ai_provider = models.CharField(max_length=50, blank=True)
+    model_name = models.CharField(max_length=100, blank=True)
+    classification_status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING
+    )
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["classification_status"]),
+            models.Index(fields=["report"]),
+        ]
+
+    def __str__(self):
+        return f"Classification for report {self.report_id} ({self.classification_status})"
 
 
 class ReportImage(models.Model):

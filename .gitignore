@@ -34,3 +34,7 @@ frontend/dist/
 # OS
 .DS_Store
 Thumbs.db
+
+
+.kilo/kilo.jsonc
+backend/.env.example

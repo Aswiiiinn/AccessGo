@@ -1,4 +1,4 @@
-import io
+﻿import io
 from PIL import Image as PilImage
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -12,7 +12,7 @@ User = get_user_model()
 LOGIN_URL = reverse("token_obtain_pair")
 
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+# â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def get_token(client, email, password):
     res = client.post(LOGIN_URL, {"email": email, "password": password})
@@ -32,7 +32,7 @@ def make_location(**kwargs):
     return AccessibilityLocation.objects.create(**defaults)
 
 
-# ── Report CRUD ───────────────────────────────────────────────────────────────
+# â”€â”€ Report CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class ReportCRUDTest(APITestCase):
     def setUp(self):
@@ -160,7 +160,7 @@ class ReportCRUDTest(APITestCase):
             self.assertEqual(r["accessibility_impact"], "high")
 
 
-# ── Image upload ──────────────────────────────────────────────────────────────
+# â”€â”€ Image upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class ReportImageUploadTest(APITestCase):
     def setUp(self):
@@ -256,7 +256,7 @@ class ReportImageUploadTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
 
 
-# ── Verification (existing) ───────────────────────────────────────────────────
+# â”€â”€ Verification (existing) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class ReportVerificationTest(APITestCase):
     def setUp(self):
@@ -317,7 +317,7 @@ class ReportVerificationTest(APITestCase):
         self.assertEqual(res.data["verification_count"], 1)
 
 
-# ── Verification Business Rules ───────────────────────────────────────────────
+# â”€â”€ Verification Business Rules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class VerificationBusinessRulesTest(APITestCase):
     def setUp(self):
@@ -481,7 +481,7 @@ class VerificationBusinessRulesTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
 
-# ── Service layer ─────────────────────────────────────────────────────────────
+# â”€â”€ Service layer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class ReportServiceTest(APITestCase):
     def setUp(self):
@@ -510,3 +510,200 @@ class ReportServiceTest(APITestCase):
         add_verification(report, verifier, "confirm")
         with self.assertRaises(ValidationError):
             add_verification(report, verifier, "confirm")
+
+# â”€â”€ AI classification (Gemini, mocked) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+import json
+from unittest.mock import patch
+
+from django.test import override_settings
+from .models import ReportClassification
+
+
+class ReportAIClassificationTest(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email="aicls@example.com", password="Pass1234!")
+        self.other = User.objects.create_user(email="aicls_other@example.com", password="Pass1234!")
+        self.admin = User.objects.create_user(email="aicls_admin@example.com", password="Pass1234!", role="admin")
+        self.location = make_location(name="AI Station", location_type="station")
+        self.user_token = get_token(self.client, "aicls@example.com", "Pass1234!")
+        self.other_token = get_token(self.client, "aicls_other@example.com", "Pass1234!")
+        self.admin_token = get_token(self.client, "aicls_admin@example.com", "Pass1234!")
+        self.list_url = reverse("report-list")
+        self.allowed_categories = list(getattr(AccessibilityReport, "AI_SUGGESTED_CATEGORIES", [])) or ["elevator", "ramp", "other", "unknown"]
+
+    def _create_report(self, token=None, desc="The elevator at Gdansk main railway station is not working. Wheelchair users cannot access the platform."):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token or self.user_token}")
+        return self.client.post(self.list_url, {
+            "location": self.location.pk,
+            "title": "Broken elevator",
+            "description": desc,
+            "category": "user-elevator",
+            "accessibility_impact": "medium",
+        })
+
+    @patch("ai_services.classifier.generate_classification_json")
+    def test_successful_classification(self, mock_generate):
+        mock_generate.return_value = json.dumps({
+            "category": "elevator",
+            "severity": "high",
+            "keywords": ["elevator", "wheelchair access", "platform access"],
+            "summary": "Elevator malfunction restricting wheelchair access to the platform.",
+            "confidence": 0.95,
+        })
+        res = self._create_report()
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        report = AccessibilityReport.objects.get(pk=res.data["id"])
+        self.assertEqual(report.category, "user-elevator")
+        self.assertEqual(report.accessibility_impact, "medium")
+        cls = ReportClassification.objects.get(report=report)
+        self.assertEqual(cls.classification_status, ReportClassification.Status.COMPLETED)
+        self.assertEqual(cls.suggested_category, "elevator")
+        self.assertEqual(cls.suggested_severity, "high")
+        self.assertEqual(cls.confidence_score, 0.95)
+        self.assertIn("elevator", cls.keywords)
+        self.assertTrue(cls.summary)
+        self.assertEqual(cls.ai_provider, "gemini")
+
+    @patch("ai_services.classifier.generate_classification_json")
+    def test_correct_category_and_severity_mapping(self, mock_generate):
+        mock_generate.return_value = json.dumps({
+            "category": "ramp",
+            "severity": "critical",
+            "keywords": ["ramp"],
+            "summary": "Ramp blocked.",
+            "confidence": 0.8,
+        })
+        res = self._create_report()
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        cls = ReportClassification.objects.get(report_id=res.data["id"])
+        self.assertEqual(cls.suggested_category, "ramp")
+        self.assertEqual(cls.suggested_severity, "critical")
+        self.assertIn(cls.suggested_category, self.allowed_categories)
+
+    @patch("ai_services.classifier.generate_classification_json")
+    def test_invalid_category_returned_by_ai(self, mock_generate):
+        mock_generate.return_value = json.dumps({
+            "category": "not-a-real-category",
+            "severity": "high",
+            "keywords": [],
+            "summary": "x",
+            "confidence": 0.5,
+        })
+        res = self._create_report()
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        cls = ReportClassification.objects.get(report_id=res.data["id"])
+        self.assertEqual(cls.classification_status, ReportClassification.Status.FAILED)
+        self.assertTrue(cls.error_message)
+
+    @patch("ai_services.classifier.generate_classification_json")
+    def test_invalid_severity_returned_by_ai(self, mock_generate):
+        mock_generate.return_value = json.dumps({
+            "category": "elevator",
+            "severity": "extreme",
+            "keywords": [],
+            "summary": "x",
+            "confidence": 0.5,
+        })
+        res = self._create_report()
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        cls = ReportClassification.objects.get(report_id=res.data["id"])
+        self.assertEqual(cls.classification_status, ReportClassification.Status.FAILED)
+
+    @patch("ai_services.classifier.generate_classification_json")
+    def test_invalid_json_response(self, mock_generate):
+        mock_generate.return_value = "this is not json"
+        res = self._create_report()
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        cls = ReportClassification.objects.get(report_id=res.data["id"])
+        self.assertEqual(cls.classification_status, ReportClassification.Status.FAILED)
+
+    @patch("ai_services.classifier.generate_classification_json")
+    def test_gemini_api_timeout(self, mock_generate):
+        from ai_services.gemini_client import GeminiUnavailableError
+        mock_generate.side_effect = GeminiUnavailableError("timeout")
+        res = self._create_report()
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        cls = ReportClassification.objects.get(report_id=res.data["id"])
+        self.assertEqual(cls.classification_status, ReportClassification.Status.FAILED)
+
+    @patch("ai_services.classifier.generate_classification_json")
+    def test_gemini_api_rate_limit(self, mock_generate):
+        from ai_services.gemini_client import GeminiRateLimitError
+        mock_generate.side_effect = GeminiRateLimitError("rate limited")
+        res = self._create_report()
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        cls = ReportClassification.objects.get(report_id=res.data["id"])
+        self.assertEqual(cls.classification_status, ReportClassification.Status.FAILED)
+
+    @patch("ai_services.classifier.generate_classification_json")
+    def test_gemini_api_unavailable(self, mock_generate):
+        from ai_services.gemini_client import GeminiUnavailableError
+        mock_generate.side_effect = GeminiUnavailableError("unavailable")
+        res = self._create_report()
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertIn("id", res.data)
+        cls = ReportClassification.objects.get(report_id=res.data["id"])
+        self.assertEqual(cls.classification_status, ReportClassification.Status.FAILED)
+
+    @patch("ai_services.classifier.generate_classification_json")
+    def test_report_creation_succeeds_when_ai_classification_fails(self, mock_generate):
+        mock_generate.side_effect = RuntimeError("boom")
+        res = self._create_report()
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(AccessibilityReport.objects.filter(pk=res.data["id"]).exists())
+        cls = ReportClassification.objects.get(report_id=res.data["id"])
+        self.assertEqual(cls.classification_status, ReportClassification.Status.FAILED)
+
+    @patch("ai_services.classifier.generate_classification_json")
+    def test_existing_report_apis_continue_working(self, mock_generate):
+        mock_generate.return_value = json.dumps({
+            "category": "elevator", "severity": "high", "keywords": [], "summary": "s", "confidence": 0.9
+        })
+        res = self._create_report()
+        pk = res.data["id"]
+        self.client.credentials()
+        detail = self.client.get(reverse("report-detail", args=[pk]))
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        lst = self.client.get(self.list_url)
+        self.assertEqual(lst.status_code, status.HTTP_200_OK)
+        self.assertIn("results", lst.data)
+
+    @patch("ai_services.classifier.generate_classification_json")
+    def test_classification_not_duplicated_on_reprocess(self, mock_generate):
+        mock_generate.return_value = json.dumps({
+            "category": "elevator", "severity": "high", "keywords": ["k"], "summary": "s", "confidence": 0.9
+        })
+        res = self._create_report()
+        report = AccessibilityReport.objects.get(pk=res.data["id"])
+        from .services import classify_report_async
+        c1 = classify_report_async(report, force=True)
+        c2 = classify_report_async(report, force=True)
+        self.assertEqual(ReportClassification.objects.filter(report=report).count(), 1)
+        self.assertEqual(c1.pk, c2.pk)
+
+    @patch("ai_services.classifier.generate_classification_json")
+    def test_unauthorized_users_cannot_access_protected_classification(self, mock_generate):
+        mock_generate.return_value = json.dumps({
+            "category": "elevator", "severity": "high", "keywords": [], "summary": "s", "confidence": 0.9
+        })
+        res = self._create_report()
+        pk = res.data["id"]
+        url = reverse("report-classification", args=[pk])
+        # unauthenticated
+        self.client.credentials()
+        r1 = self.client.get(url)
+        self.assertEqual(r1.status_code, status.HTTP_401_UNAUTHORIZED)
+        # other non-admin user
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.other_token}")
+        r2 = self.client.get(url)
+        self.assertEqual(r2.status_code, status.HTTP_403_FORBIDDEN)
+        # author
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.user_token}")
+        r3 = self.client.get(url)
+        self.assertEqual(r3.status_code, status.HTTP_200_OK)
+        # admin
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.admin_token}")
+        r4 = self.client.get(url)
+        self.assertEqual(r4.status_code, status.HTTP_200_OK)
+
