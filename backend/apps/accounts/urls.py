@@ -16,17 +16,27 @@ from .views import (
     AdminUserListView,
     AdminUserStatusUpdateView,
     AdminVerifyReportView,
+    ChangeEmailView,
+    ChangePasswordView,
+    ForgotPasswordView,
     ProfileView,
     RegisterView,
+    ResetPasswordConfirmView,
+    ResetPasswordValidateView,
 )
 
 urlpatterns = [
-    # Auth (kept for compatibility)
+    # Auth
     path("auth/register/", RegisterView.as_view(), name="register"),
     path("auth/login/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("auth/logout/", TokenBlacklistView.as_view(), name="token_blacklist"),
     path("auth/profile/", ProfileView.as_view(), name="profile"),
+    path("auth/forgot-password/", ForgotPasswordView.as_view(), name="forgot-password"),
+    path("auth/reset-password/validate/", ResetPasswordValidateView.as_view(), name="reset-password-validate"),
+    path("auth/reset-password/confirm/", ResetPasswordConfirmView.as_view(), name="reset-password-confirm"),
+    path("auth/change-password/", ChangePasswordView.as_view(), name="change-password"),
+    path("auth/change-email/", ChangeEmailView.as_view(), name="change-email"),
 
     # Admin dashboard/statistics
     path("dashboard/statistics/", AdminDashboardStatisticsView.as_view(), name="admin-dashboard-statistics"),

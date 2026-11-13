@@ -114,7 +114,8 @@ class ReportCRUDTest(APITestCase):
         self.assertEqual(res.data["status"], "pending")
 
     def test_author_cannot_change_ai_classification(self):
-        pk = self._create().data["id"]
+        created = self._create().data
+        pk = created["id"]
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.author_token}")
         res = self.client.patch(
             self._detail(pk),
@@ -122,7 +123,9 @@ class ReportCRUDTest(APITestCase):
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertIsNone(res.data["ai_classification"])
+        # Creation records a classification result (or failure); the author's PATCH must not alter it.
+        self.assertEqual(res.data["ai_classification"], created["ai_classification"])
+        self.assertNotEqual((res.data["ai_classification"] or {}).get("category"), "hacked")
 
     def test_author_can_delete_own_report(self):
         pk = self._create().data["id"]
@@ -706,4 +709,3 @@ class ReportAIClassificationTest(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.admin_token}")
         r4 = self.client.get(url)
         self.assertEqual(r4.status_code, status.HTTP_200_OK)
-

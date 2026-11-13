@@ -1,11 +1,16 @@
 import json
+import logging
 import os
 import socket
+
+from django.conf import settings
 
 from google import genai
 from google.genai import types
 
 DEFAULT_TIMEOUT_SECONDS = 15
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiAPIError(Exception):
@@ -51,6 +56,8 @@ def _is_timeout_or_unavailable(exc: Exception) -> bool:
 
 
 def generate_classification_json(system_instruction: str, user_prompt: str) -> str:
+    if not getattr(settings, "GEMINI_ENABLED", True):
+        raise GeminiUnavailableError("Gemini is disabled (GEMINI_ENABLED=false or running tests).")
     api_key, model, timeout = _get_config()
     if not api_key or not model:
         raise GeminiUnavailableError("Gemini is not configured.")
@@ -69,6 +76,8 @@ def generate_classification_json(system_instruction: str, user_prompt: str) -> s
             config=config,
         )
     except Exception as exc:
+        # Keep the provider's own message in the server log; the API response stays generic.
+        logger.warning("Gemini call failed (model=%s): %s: %s", model, type(exc).__name__, str(exc)[:500])
         if _is_rate_limit_error(exc):
             raise GeminiRateLimitError("Gemini rate limit exceeded.") from exc
         if _is_timeout_or_unavailable(exc):

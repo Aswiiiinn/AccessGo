@@ -1,7 +1,17 @@
+import logging
+from urllib.parse import urlencode
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
+from django.db import transaction
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
@@ -22,6 +32,11 @@ from .serializers import (
     AdminUserStatusUpdateSerializer,
     DashboardStatisticsSerializer,
     RegisterSerializer,
+    ForgotPasswordSerializer,
+    ResetPasswordConfirmSerializer,
+    ResetPasswordTokenSerializer,
+    ChangePasswordSerializer,
+    ChangeEmailSerializer,
     UserProfileSerializer,
 )
 from .services import (
@@ -37,9 +52,12 @@ from .services import (
     reject_report,
     request_report_info,
     resolve_report,
+    revoke_all_refresh_tokens,
     update_user_account_status,
     verify_report,
 )
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -56,6 +74,120 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class ForgotPasswordView(APIView):
+    """Request a password reset email.
+
+    Always returns the same 200 response so the endpoint cannot be used to discover
+    which email addresses are registered. Rate limited per client IP.
+    """
+
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "password_reset"
+    serializer_class = ForgotPasswordSerializer
+    GENERIC_RESPONSE = {"detail": "If an account with that email exists, a password reset link has been sent."}
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        if user is not None and user.has_usable_password():
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            reset_url = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/reset-password?{urlencode({'uid': uid, 'token': token})}"
+            expiry_minutes = max(1, settings.PASSWORD_RESET_TIMEOUT // 60)
+            try:
+                send_mail(
+                    subject="AccessGo password reset",
+                    message=(
+                        "We received a request to reset your AccessGo password.\n\n"
+                        f"Reset your password here: {reset_url}\n\n"
+                        f"This link expires in {expiry_minutes} minutes and can only be used once.\n"
+                        "If you did not request this, you can safely ignore this email."
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+            except Exception:
+                # Never surface delivery failures to the client: a 500 here would
+                # reveal that the address belongs to an account.
+                logger.exception("Failed to send password reset email for user id=%s", user.pk)
+        return Response(self.GENERIC_RESPONSE)
+
+
+class ResetPasswordValidateView(APIView):
+    """Check a reset link's uid/token before showing the new-password form."""
+
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "password_reset_confirm"
+
+    def post(self, request):
+        serializer = ResetPasswordTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response({"valid": True})
+
+
+class ResetPasswordConfirmView(APIView):
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "password_reset_confirm"
+    serializer_class = ResetPasswordConfirmSerializer
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data["user"]
+        with transaction.atomic():
+            # Changing the password hash also invalidates the reset token (no reuse).
+            user.set_password(serializer.validated_data["new_password"])
+            user.save(update_fields=["password", "updated_at"])
+            revoke_all_refresh_tokens(user)
+        return Response({"detail": "Password reset successful. You can now log in."})
+
+
+class ChangePasswordView(APIView):
+    """Change the authenticated user's password.
+
+    All of the user's refresh tokens are blacklisted afterwards, so every session
+    (including the current one) must log in again: the response says so via
+    ``reauthentication_required``.
+    """
+
+    permission_classes = (permissions.IsAuthenticated,)
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "password_change"
+    serializer_class = ChangePasswordSerializer
+
+    def post(self, request):
+        user = request.user
+        serializer = self.serializer_class(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            user.set_password(serializer.validated_data["new_password"])
+            user.save(update_fields=["password", "updated_at"])
+            revoke_all_refresh_tokens(user)
+        return Response({
+            "detail": "Password changed successfully. Please log in again with your new password.",
+            "reauthentication_required": True,
+        })
+
+
+class ChangeEmailView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = ChangeEmailSerializer
+
+    def post(self, request):
+        user = request.user
+        serializer = self.serializer_class(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        user.email = serializer.validated_data["new_email"].lower()
+        user.save(update_fields=["email", "updated_at"])
+        return Response({"detail": "Email changed successfully."})
 
 
 class AdminDashboardStatisticsView(APIView):

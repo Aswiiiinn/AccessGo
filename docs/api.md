@@ -1,5 +1,38 @@
 ﻿# API Endpoint Documentation
 
+## Journey Planning (Route-Aware)
+
+### POST /api/v1/reports/near-route/
+Returns accessibility reports within a configurable distance of a route polyline (standard walking route context).
+
+**Auth:** Public (AllowAny)  
+**Request:** `application/json`
+```json
+{
+  "route": [[lat, lng], [lat, lng], ...],
+  "distance_m": 50
+}
+```
+- `route`: required, 2..500 points, each `[lat, lng]` numeric, lat in [-90,90], lng in [-180,180]
+- `distance_m`: optional, default 50, range 1..2000 (meters)
+
+**Response:** `200 OK`
+```json
+{
+  "count": 2,
+  "distance_m": 50,
+  "results": [ /* AccessibilityReport objects including location_detail */ ]
+}
+```
+**Errors:** 400 for invalid/missing route, out-of-range coords, or invalid distance.
+
+**Implementation notes:** Uses bounding-box prefilter on `AccessibilityLocation` coordinates then point-to-segment distance (equirectangular approximation) to test corridor proximity. No PostGIS required for MVP.
+
+### Report serialization addition
+`GET /api/v1/reports/` and `GET /api/v1/reports/{id}/` now include `location_detail` (`id, name, location_type, address, latitude, longitude`). `location` remains the location ID for compatibility.
+
+---
+
 Base URL: `http://localhost:8000/api/v1`
 
 All authenticated endpoints require: `Authorization: Bearer <access_token>`

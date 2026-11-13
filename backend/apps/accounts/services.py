@@ -1,11 +1,14 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import models
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Q
+from django.db.models import Count
 from django.db.models.functions import TruncDay, TruncMonth
 from rest_framework.exceptions import ValidationError
 
 from apps.accessibility.models import AccessibilityLocation
-from apps.reports.models import AccessibilityReport, ReportVerification
+from apps.reports.models import AccessibilityReport, ReportVerification, ReportClassification
 
 from .models import AdminReportReview
 
@@ -49,7 +52,7 @@ def get_admin_dashboard_statistics():
 
 def get_admin_reports_queryset():
     return (
-        AccessibilityReport.objects.select_related("author", "location")
+        AccessibilityReport.objects.select_related("author", "location", "classification")
         .prefetch_related("images", "verifications", "admin_reviews__admin")
         .annotate(
             image_count_agg=Count("images", distinct=True),
@@ -205,3 +208,18 @@ def update_user_account_status(target_user, acting_admin, is_active):
     target_user.is_active = bool(is_active)
     target_user.save(update_fields=["is_active"])
     return target_user
+
+def revoke_all_refresh_tokens(user):
+    """Blacklist every outstanding Simple JWT refresh token issued to ``user``.
+
+    Used after a password change/reset so that sessions on other devices cannot
+    keep minting access tokens. Already-issued access tokens stay valid until they
+    expire (SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"]).
+    """
+    from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+
+    outstanding = OutstandingToken.objects.filter(user=user).exclude(blacklistedtoken__isnull=False)
+    BlacklistedToken.objects.bulk_create(
+        [BlacklistedToken(token=token) for token in outstanding],
+        ignore_conflicts=True,
+    )

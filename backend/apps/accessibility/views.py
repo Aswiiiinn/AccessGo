@@ -16,7 +16,9 @@ class AccessibilityLocationViewSet(viewsets.ModelViewSet):
     ordering_fields = ("name", "created_at")
 
     def get_permissions(self):
-        if self.action in ("create", "update", "partial_update", "destroy"):
+        if self.action == "create":
+            return [permissions.IsAuthenticated()]
+        if self.action in ("update", "partial_update", "destroy"):
             return [permissions.IsAdminUser()]
         return [permissions.AllowAny()]
 

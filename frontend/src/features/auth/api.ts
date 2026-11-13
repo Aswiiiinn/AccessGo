@@ -1,39 +1,99 @@
 import apiClient from '@/lib/axios'
-import { setTokens, clearTokens } from '@/lib/auth'
-import type { User } from '@/types'
+import { setTokens, clearTokens, getRefreshToken } from '@/lib/auth'
+import type {
+  AuthCredentials,
+  LoginResponse,
+  RegisterRequest,
+  UserProfile,
+  ForgotPasswordRequest,
+  ResetPasswordConfirmRequest,
+  ResetPasswordValidateRequest,
+  ChangePasswordRequest,
+  ChangePasswordResponse,
+  ChangeEmailRequest,
+  ProfileUpdateRequest,
+  DetailResponse,
+} from '@/types'
 
-export interface LoginCredentials {
-  username: string
-  password: string
-}
+export const authApi = {
+  login: async (credentials: AuthCredentials): Promise<LoginResponse> => {
+    const { data } = await apiClient.post('/auth/login/', credentials)
+    setTokens(data.access, data.refresh)
+    return data
+  },
 
-export interface RegisterData {
-  username: string
-  email: string
-  password: string
-}
+  register: async (requestData: RegisterRequest): Promise<UserProfile> => {
+    const { data } = await apiClient.post<UserProfile>('/auth/register/', requestData)
+    return data
+  },
 
-export const login = async (credentials: LoginCredentials): Promise<void> => {
-  const { data } = await apiClient.post('/auth/login/', credentials)
-  setTokens(data.access, data.refresh)
-}
+  /**
+   * Blacklists the refresh token on the server (Simple JWT TokenBlacklistView), then
+   * clears local tokens. Local tokens are cleared even if the server call fails
+   * (e.g. the token was already revoked or the network is down).
+   */
+  logout: async (): Promise<void> => {
+    const refresh = getRefreshToken()
+    try {
+      if (refresh) await apiClient.post('/auth/logout/', { refresh })
+    } catch {
+      // Token already invalid/expired, or server unreachable — nothing more to revoke.
+    } finally {
+      clearTokens()
+    }
+  },
 
-export const register = async (data: RegisterData): Promise<User> => {
-  const response = await apiClient.post<User>('/auth/register/', data)
-  return response.data
-}
+  getProfile: async (): Promise<UserProfile> => {
+    const { data } = await apiClient.get<UserProfile>('/auth/profile/')
+    return data
+  },
 
-export const logout = async (refresh: string): Promise<void> => {
-  await apiClient.post('/auth/logout/', { refresh })
-  clearTokens()
-}
+  updateProfile: async (payload: ProfileUpdateRequest): Promise<UserProfile> => {
+    if (payload.avatar instanceof File) {
+      const form = new FormData()
+      for (const [key, value] of Object.entries(payload)) {
+        if (value === undefined || value === null) continue
+        form.append(key, value as string | Blob)
+      }
+      // Let the browser set the multipart boundary.
+      const { data } = await apiClient.patch<UserProfile>('/auth/profile/', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      return data
+    }
+    const { data } = await apiClient.patch<UserProfile>('/auth/profile/', payload)
+    return data
+  },
 
-export const getProfile = async (): Promise<User> => {
-  const { data } = await apiClient.get<User>('/auth/profile/')
-  return data
-}
+  changeEmail: async (payload: ChangeEmailRequest): Promise<DetailResponse> => {
+    const { data } = await apiClient.post<DetailResponse>('/auth/change-email/', payload)
+    return data
+  },
 
-export const updateProfile = async (payload: Partial<User>): Promise<User> => {
-  const { data } = await apiClient.patch<User>('/auth/profile/', payload)
-  return data
+  forgotPassword: async (payload: ForgotPasswordRequest): Promise<DetailResponse> => {
+    const { data } = await apiClient.post<DetailResponse>('/auth/forgot-password/', payload)
+    return data
+  },
+
+  validateResetToken: async (payload: ResetPasswordValidateRequest): Promise<void> => {
+    await apiClient.post('/auth/reset-password/validate/', payload)
+  },
+
+  resetPasswordConfirm: async (payload: ResetPasswordConfirmRequest): Promise<DetailResponse> => {
+    const { data } = await apiClient.post<DetailResponse>('/auth/reset-password/confirm/', payload)
+    return data
+  },
+
+  changePassword: async (payload: ChangePasswordRequest): Promise<ChangePasswordResponse> => {
+    const { data } = await apiClient.post<ChangePasswordResponse>('/auth/change-password/', payload)
+    return data
+  },
+
+  refreshToken: async (refresh: string): Promise<LoginResponse> => {
+    const { data } = await apiClient.post<LoginResponse>('/auth/token/refresh/', { refresh })
+    if (data.access) {
+      setTokens(data.access, data.refresh)
+    }
+    return data
+  },
 }

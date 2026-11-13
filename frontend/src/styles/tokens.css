@@ -1,0 +1,121 @@
+/* ==========================================================================
+   AccessGo design tokens
+   Single source of truth for colour, type, spacing, radii, shadows, motion.
+   Bootstrap 5.3 is themed through its CSS variables so existing markup
+   (btn-primary, form-control, card, badge…) inherits the AccessGo look.
+   ========================================================================== */
+
+:root {
+  /* Brand */
+  --ag-navy: #172b4d;
+  --ag-navy-700: #10203b;
+  --ag-navy-50: #eef1f7;
+  --ag-teal: #13a89e;
+  --ag-teal-700: #0b7d75; /* AA contrast on white for text/links */
+  --ag-teal-50: #e7f6f5;
+
+  /* Neutrals */
+  --ag-bg: #f7f9fc;
+  --ag-surface: #ffffff;
+  --ag-surface-muted: #f1f4f9;
+  --ag-text: #202b38;
+  --ag-text-muted: #667085;
+  --ag-border: #e3e8ef;
+  --ag-border-strong: #cfd6e1;
+
+  /* Semantic (each has a strong tone for text/icons and a soft tone for fills) */
+  --ag-success: #1e7f4f;
+  --ag-success-soft: #e6f4ec;
+  --ag-warning: #9a5b00;
+  --ag-warning-fill: #f5a524;
+  --ag-warning-soft: #fff4e0;
+  --ag-danger: #c0392b;
+  --ag-danger-soft: #fdecea;
+  --ag-info: #1d5fbf;
+  --ag-info-soft: #e8f0fc;
+  --ag-ai: #6941c6;
+  --ag-ai-soft: #f4f0ff;
+
+  /* Severity scale (map markers, indicators) */
+  --ag-sev-low: #2f80ed;
+  --ag-sev-medium: #d19a00;
+  --ag-sev-high: #e8590c;
+  --ag-sev-critical: #c0392b;
+
+  /* Typography */
+  --ag-font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ag-fs-xs: 0.75rem;   /* captions */
+  --ag-fs-sm: 0.875rem;  /* supporting text, labels */
+  --ag-fs-base: 1rem;    /* body (16px avoids iOS zoom on focus) */
+  --ag-fs-md: 1.0625rem; /* card titles */
+  --ag-fs-lg: 1.25rem;   /* section headings */
+  --ag-fs-xl: 1.5rem;    /* page headings (mobile) */
+  --ag-fs-2xl: 1.875rem; /* page headings (desktop) */
+  --ag-lh-tight: 1.25;
+  --ag-lh-base: 1.5;
+
+  /* Spacing (4px grid) */
+  --ag-space-1: 0.25rem;
+  --ag-space-2: 0.5rem;
+  --ag-space-3: 0.75rem;
+  --ag-space-4: 1rem;
+  --ag-space-5: 1.25rem;
+  --ag-space-6: 1.5rem;
+  --ag-space-8: 2rem;
+
+  /* Shape & depth */
+  --ag-radius-sm: 8px;
+  --ag-radius: 12px;
+  --ag-radius-lg: 16px;
+  --ag-radius-xl: 24px;
+  --ag-radius-pill: 999px;
+  --ag-shadow-sm: 0 1px 2px rgba(16, 32, 59, 0.06);
+  --ag-shadow: 0 1px 3px rgba(16, 32, 59, 0.08), 0 4px 12px rgba(16, 32, 59, 0.05);
+  --ag-shadow-lg: 0 12px 32px rgba(16, 32, 59, 0.16);
+
+  /* Interaction */
+  --ag-tap: 44px;               /* minimum touch target */
+  --ag-focus-ring: 0 0 0 3px rgba(19, 168, 158, 0.45);
+  --ag-duration: 160ms;
+  --ag-ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Layout */
+  --ag-topbar-h: 56px;
+  --ag-bottomnav-h: 64px;
+  --ag-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --ag-safe-top: env(safe-area-inset-top, 0px);
+
+  /* ---- Bootstrap theming ---- */
+  --bs-body-font-family: var(--ag-font);
+  --bs-body-color: var(--ag-text);
+  --bs-body-bg: var(--ag-bg);
+  --bs-secondary-color: var(--ag-text-muted);
+  --bs-border-color: var(--ag-border);
+  --bs-border-radius: var(--ag-radius-sm);
+  --bs-border-radius-lg: var(--ag-radius);
+  --bs-border-radius-sm: 6px;
+  --bs-primary: var(--ag-navy);
+  --bs-primary-rgb: 23, 43, 77;
+  --bs-link-color: var(--ag-teal-700);
+  --bs-link-color-rgb: 11, 125, 117;
+  --bs-link-hover-color: var(--ag-navy);
+  --bs-link-hover-color-rgb: 23, 43, 77;
+  --bs-success-rgb: 30, 127, 79;
+  --bs-danger-rgb: 192, 57, 43;
+  --bs-focus-ring-color: rgba(19, 168, 158, 0.45);
+  --bs-heading-color: var(--ag-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ag-duration: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

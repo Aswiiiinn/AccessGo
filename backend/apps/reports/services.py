@@ -179,3 +179,34 @@ def classify_report_async(report: AccessibilityReport, force: bool = False):
         except Exception:
             pass
         return classification
+
+
+def review_classification(report, user, action, reason=""):
+    """Accept or reject an AI classification suggestion. Only author/admin may review."""
+    from .classification_services import review_classification as _review
+    return _review(report, user, action, reason)
+
+
+def get_classification_reviews_for_report(report):
+    from .classification_services import get_classification_reviews_for_report as _get
+    return _get(report)
+
+
+def create_potential_duplicates(report, max_candidates=5):
+    from .duplicate_services import create_potential_duplicates as _create
+    return _create(report, max_candidates=max_candidates)
+
+
+def get_potential_duplicates_for_report(report):
+    from .duplicate_services import get_potential_duplicates_for_report as _get
+    return _get(report)
+
+
+def review_duplicate(duplicate_id, admin_user, action, reason=""):
+    from .duplicate_services import review_duplicate as _review
+    return _review(duplicate_id, admin_user, action, reason)
+
+
+def get_admin_duplicate_reports_queryset(status=None):
+    from .duplicate_services import get_admin_duplicate_reports_queryset as _get
+    return _get(status=status)

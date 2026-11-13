@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import timedelta
 import os
+import sys
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -113,6 +114,12 @@ REST_FRAMEWORK = {
         "rest_framework.renderers.JSONRenderer",
     ),
     "EXCEPTION_HANDLER": "config.exceptions.api_exception_handler",
+    # Only views that set throttle_scope are throttled (password recovery/change).
+    "DEFAULT_THROTTLE_RATES": {
+        "password_reset": os.environ.get("THROTTLE_PASSWORD_RESET", "5/hour"),
+        "password_reset_confirm": os.environ.get("THROTTLE_PASSWORD_RESET_CONFIRM", "20/hour"),
+        "password_change": os.environ.get("THROTTLE_PASSWORD_CHANGE", "10/hour"),
+    },
 }
 
 SIMPLE_JWT = {
@@ -125,6 +132,22 @@ SIMPLE_JWT = {
     "USER_ID_CLAIM": "user_id",
 }
 
+FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "http://localhost:5173")
+
+# Password reset links expire after this many seconds (Django default is 3 days).
+PASSWORD_RESET_TIMEOUT = int(os.environ.get("PASSWORD_RESET_TIMEOUT", "3600"))
+
+# Email delivery (password reset). Defaults to SMTP; development.py defaults to the
+# console backend so reset emails are printed to the runserver terminal.
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").lower() in ("1", "true", "yes")
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "10"))
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@accessgo.local")
+
 AI_API_KEY = os.environ.get("AI_API_KEY", "")
 AI_API_URL = os.environ.get("AI_API_URL", "")
 
@@ -132,3 +155,8 @@ AI_API_URL = os.environ.get("AI_API_URL", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "")
 GEMINI_TIMEOUT_SECONDS = float(os.environ.get("GEMINI_TIMEOUT_SECONDS", "15"))
+# Set GEMINI_ENABLED=false to stop all live AI calls (reports are still created; classification
+# is recorded as failed). Always off under `manage.py test` so the test suite never spends API quota.
+GEMINI_ENABLED = os.environ.get("GEMINI_ENABLED", "true").lower() in ("1", "true", "yes")
+if len(sys.argv) > 1 and sys.argv[1] == "test":
+    GEMINI_ENABLED = False
